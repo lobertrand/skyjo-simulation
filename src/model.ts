@@ -1,10 +1,24 @@
-// PC = Player card
-const PC_COLS = 4;
-const PC_ROWS = 3;
-const PC_COUNT = PC_COLS * PC_ROWS;
+import type P5 from "p5";
+import { cardColorForValue } from "./drawing";
+import { Log } from "./logger";
 
-class Card {
-  constructor({ value, revealed = false }) {
+// PC = Player card
+export const PC_COLS = 4;
+export const PC_ROWS = 3;
+export const PC_COUNT = PC_COLS * PC_ROWS;
+
+export class Card {
+  value: number;
+  revealed: boolean;
+  color: string;
+
+  constructor({
+    value,
+    revealed = false,
+  }: {
+    value: number;
+    revealed?: boolean;
+  }) {
     this.value = value;
     this.revealed = revealed;
     this.color = cardColorForValue(value);
@@ -14,21 +28,25 @@ class Card {
     this.revealed = true;
   }
 
-  static createMany({ n, value }) {
-    return Array.from({ length: n }, (x) => new Card({ value }));
+  static createMany({ n, value }: { n: number; value: number }) {
+    return Array.from({ length: n }, () => new Card({ value }));
   }
 }
 
-class Player {
-  constructor({ name, strategy }) {
+export class Player {
+  name: string;
+  // Cards are store in the list by columns, from top to bottom
+  // [col1, col1, col1, col2, col2, col2, col3, col3, col3]
+  cards: Array<Card | null>;
+  strategy: GameStrategy;
+
+  constructor({ name, strategy }: { name: string; strategy: GameStrategy }) {
     this.name = name;
-    // Cards are store in the list by columns, from top to bottom
-    // [col1, col1, col1, col2, col2, col2, col3, col3, col3]
     this.cards = [];
     this.strategy = strategy;
   }
 
-  *play(game) {
+  *play(game: Game) {
     yield* this.strategy.play({ game, player: this });
   }
 
@@ -43,18 +61,18 @@ class Player {
   revealedCardSum() {
     return this.cards
       .filter((card) => card && card.revealed)
-      .map((card) => card.value)
+      .map((card) => (card as Card).value)
       .reduce((acc, c) => acc + c, 0);
   }
 
   hasRevealedAllCards() {
-    return this.cards.filter(Boolean).every((card) => card.revealed);
+    return this.cards.filter(Boolean).every((card) => (card as Card).revealed);
   }
 
   checkFullColumn() {
     const result = {
       hasFullColumn: false,
-      fullColumIndex: -1,
+      fullColumnIndex: -1,
     };
     for (let col = 0; col < PC_COLS; col++) {
       const colOffset = col * PC_ROWS;
@@ -70,31 +88,34 @@ class Player {
   }
 }
 
-class Game {
-  constructor() {
-    // Top card of piles is the last element of the list
-    // We can :
-    // - take a peak at it using pile.at(-1)
-    // - take it using pile.pop()
-    // - add a card on top of it using pile.push()
-    this.deck = [];
-    this.discardPile = [];
-    this.players = [];
-    this.finished = false;
-    this.pickedCard = null;
-  }
+export class Game {
+  // Top card of piles is the last element of the list
+  // We can :
+  // - take a peak at it using pile.at(-1)
+  // - take it using pile.pop()
+  // - add a card on top of it using pile.push()
+  deck: Card[] = [];
+  discardPile: Card[] = [];
+  players: Player[] = [];
+  finished: boolean = false;
+  pickedCard: Card | null = null;
 
-  pickCard(card) {
+  constructor() {}
+
+  pickCard(card: Card) {
     this.pickedCard = card;
   }
 
   takePickedCard() {
+    if (this.pickedCard === null) {
+      throw new Error("Game.pickedCard is null");
+    }
     const temp = this.pickedCard;
     this.pickedCard = null;
     return temp;
   }
 
-  *initialize() {
+  *initialize(p: P5): Generator<void> {
     Log.trace("Creating a brand new deck of cards");
     this.deck = [];
     this.discardPile = [];
@@ -105,7 +126,7 @@ class Game {
     this.deck.push(...Card.createMany({ value: -2, n: 5 }));
 
     Log.trace("Shuffling deck");
-    this.deck = shuffle(this.deck);
+    this.deck = p.shuffle(this.deck);
 
     Log.trace("Dealing cards to the players");
     for (const player of this.players) {
@@ -114,7 +135,7 @@ class Game {
     for (let i = 0; i < PC_COUNT; i++) {
       for (const player of this.players) {
         yield;
-        player.cards.push(this.deck.pop());
+        player.cards.push(this.deck.pop() as Card);
       }
     }
 
@@ -123,14 +144,14 @@ class Game {
     for (const player of this.players) {
       for (let i = 0; i < 2; i++) {
         yield;
-        const card = random(player.cards.filter((card) => !card.revealed));
+        const card = p.random(player.cards.filter((card) => !card?.revealed));
         card.reveal();
       }
     }
 
     yield;
     Log.trace("One card is turned from the deck to the discard pile");
-    const firstCard = this.deck.pop();
+    const firstCard = this.deck.pop() as Card;
     firstCard.reveal();
     this.discardPile.push(firstCard);
   }
@@ -161,13 +182,13 @@ class Game {
           Log.info("Full column", {
             col,
             name: player.name,
-            value: player.cards[col * PC_ROWS].value,
+            value: (player.cards[col * PC_ROWS] as Card).value,
           });
           for (let i = 0; i < PC_ROWS; i++) {
             yield;
             const cardIndex = col * PC_ROWS + i;
             Log.trace(player.cards[cardIndex]);
-            this.discardPile.push(player.cards[cardIndex]);
+            this.discardPile.push(player.cards[cardIndex] as Card);
             player.cards[cardIndex] = null;
           }
         }
@@ -190,7 +211,7 @@ class Game {
       for (const card of remainingCards) {
         yield;
         Log.trace("revealed", card);
-        card.reveal();
+        (card as Card).reveal();
       }
       const rank = this.players
         .map((player) => ({ player, points: player.revealedCardSum() }))
@@ -210,31 +231,39 @@ class Game {
   }
 }
 
-class GameStrategy {
-  constructor({ name, play }) {
+export class GameStrategy {
+  name: string;
+  play: ({ game, player }: { game: Game; player: Player }) => Generator<void>;
+
+  constructor({
+    name,
+    play,
+  }: {
+    name: string;
+    play: ({ game, player }: { game: Game; player: Player }) => Generator<void>;
+  }) {
     this.name = name;
     this.play = play;
   }
 }
 
-const BASIC_STRATEGY = new GameStrategy({
+export const BASIC_STRATEGY = new GameStrategy({
   name: "BASIC_STRATEGY",
   play: function* ({ game, player }) {
     // Pick a card from the deck or discard pile
-    let pickedCard;
-    if (game.discardPile.at(-1).value <= 3) {
+    if ((game.discardPile.at(-1) as Card).value <= 3) {
       // Pick card from discard pile
-      game.pickCard(game.discardPile.pop());
-      Log.trace("Card taken from discard pile :", game.pickedCard.value);
+      game.pickCard(game.discardPile.pop() as Card);
+      Log.trace("Card taken from discard pile :", game.pickedCard?.value);
       yield;
     } else {
       // Reveal and pick card from deck
-      game.deck.at(-1).reveal();
+      (game.deck.at(-1) as Card).reveal();
       yield;
-      game.pickCard(game.deck.pop());
+      game.pickCard(game.deck.pop() as Card);
       yield;
-      if (game.pickedCard.value <= 5) {
-        Log.trace("Card taken from deck :", game.pickedCard.value);
+      if ((game.pickedCard as Card).value <= 5) {
+        Log.trace("Card taken from deck :", game.pickedCard?.value);
       } else {
         Log.trace(
           "Card picked from deck is too big to be profitable, discarding it"
@@ -250,14 +279,16 @@ const BASIC_STRATEGY = new GameStrategy({
       // Look at the value of the revealed cards which are greater than the picked card
       const sortedRevealedCards = indexedCards
         .filter(({ card }) => card && card.revealed)
-        .filter(({ card }) => card.value > game.pickedCard.value)
-        .sort((a, b) => b.card.value - a.card.value);
+        .filter(
+          ({ card }) => (card as Card).value > (game.pickedCard as Card).value
+        )
+        .sort((a, b) => (b.card as Card).value - (a.card as Card).value);
       Log.trace({ sortedRevealedCards });
 
       let spotIndex;
       if (
         sortedRevealedCards.length > 0 &&
-        sortedRevealedCards[0].card.value > 3
+        (sortedRevealedCards[0].card as Card).value > 3
       ) {
         // If the greatest value is big, we replace it
         spotIndex = sortedRevealedCards[0].index;
@@ -279,8 +310,8 @@ const BASIC_STRATEGY = new GameStrategy({
       // } while (!player.cards[spotIndex]);
 
       // Place the card at its spotIndex
-      player.cards[spotIndex].reveal();
-      game.discardPile.push(player.cards[spotIndex]);
+      (player.cards[spotIndex] as Card).reveal();
+      game.discardPile.push(player.cards[spotIndex] as Card);
       player.cards[spotIndex] = game.takePickedCard();
     } else {
       // Reveal a card
@@ -289,9 +320,11 @@ const BASIC_STRATEGY = new GameStrategy({
       );
       const spotIndex = nonRevealedCards[0].index;
       Log.info(
-        `Revealing player ${player.name} card with value ${player.cards[spotIndex].value}`
+        `Revealing player ${player.name} card with value ${
+          (player.cards[spotIndex] as Card).value
+        }`
       );
-      player.cards[spotIndex].reveal();
+      (player.cards[spotIndex] as Card).reveal();
     }
   },
 });

@@ -1,4 +1,4 @@
-const LogLevel = {
+export const LogLevel = {
   OFF: 0,
   ERROR: 1,
   WARN: 2,
@@ -7,34 +7,34 @@ const LogLevel = {
   TRACE: 5,
 };
 
-const Log = {
+export const Log = {
   level: LogLevel.INFO,
 
-  error(...message) {
+  error(...message: any[]) {
     if (this.level >= LogLevel.ERROR) {
       console.error(...message);
     }
   },
 
-  info(...message) {
+  info(...message: any[]) {
     if (this.level >= LogLevel.INFO) {
       console.log(...message);
     }
   },
 
-  warn(...message) {
+  warn(...message: any[]) {
     if (this.level >= LogLevel.WARN) {
       console.warn(...message);
     }
   },
 
-  debug(...message) {
+  debug(...message: any[]) {
     if (this.level >= LogLevel.DEBUG) {
       console.log(...message);
     }
   },
 
-  trace(...message) {
+  trace(...message: any[]) {
     if (this.level >= LogLevel.TRACE) {
       console.log(...message);
     }
