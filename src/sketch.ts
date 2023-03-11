@@ -1,3 +1,4 @@
+import type P5 from "p5";
 import p5 from "p5";
 import { setupStyles, showGame } from "./drawing";
 import { BASIC_STRATEGY, Game, Player } from "./model";
@@ -6,7 +7,7 @@ const game = new Game();
 let generator: Generator<void>;
 let state: "UNSTARTED" | "INIT" | "PLAYING" = "UNSTARTED";
 
-const gameLogic = (p: p5) => {
+const gameLogic = (p: P5) => {
   if (state === "UNSTARTED") {
     generator = game.initialize(p);
     state = "INIT";
@@ -22,7 +23,7 @@ const gameLogic = (p: p5) => {
   }
 };
 
-export const sketch = (p: p5) => {
+export const sketch = (p: P5) => {
   p.setup = () => {
     p.createCanvas(600, 400);
 
