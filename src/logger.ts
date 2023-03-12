@@ -7,7 +7,7 @@ export const LogLevel = {
   TRACE: 5,
 };
 
-export const Log = {
+export const LOGGER = {
   level: LogLevel.INFO,
 
   error(...message: any[]) {

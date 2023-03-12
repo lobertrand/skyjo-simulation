@@ -1,6 +1,7 @@
 import type P5 from "p5";
 import { cardColorForValue } from "./drawing";
-import { Log } from "./logger";
+import { p5Instance as p } from "./sketch";
+import { LOGGER } from "./logger";
 
 // PC = Player card
 export const PC_COLS = 4;
@@ -10,7 +11,7 @@ export const PC_COUNT = PC_COLS * PC_ROWS;
 export class Card {
   value: number;
   revealed: boolean;
-  color: string;
+  color: P5.Color;
 
   constructor({
     value,
@@ -115,8 +116,8 @@ export class Game {
     return temp;
   }
 
-  *initialize(p: P5): Generator<void> {
-    Log.trace("Creating a brand new deck of cards");
+  *initialize(): Generator<void> {
+    LOGGER.trace("Creating a brand new deck of cards");
     this.deck = [];
     this.discardPile = [];
     for (let value = -1; value <= 12; value++) {
@@ -125,10 +126,10 @@ export class Game {
     this.deck.push(...Card.createMany({ value: 0, n: 5 }));
     this.deck.push(...Card.createMany({ value: -2, n: 5 }));
 
-    Log.trace("Shuffling deck");
+    LOGGER.trace("Shuffling deck");
     this.deck = p.shuffle(this.deck);
 
-    Log.trace("Dealing cards to the players");
+    LOGGER.trace("Dealing cards to the players");
     for (const player of this.players) {
       player.cards = [];
     }
@@ -140,7 +141,7 @@ export class Game {
     }
 
     yield;
-    Log.trace("Each player turns 2 random cards");
+    LOGGER.trace("Each player turns 2 random cards");
     for (const player of this.players) {
       for (let i = 0; i < 2; i++) {
         yield;
@@ -150,7 +151,7 @@ export class Game {
     }
 
     yield;
-    Log.trace("One card is turned from the deck to the discard pile");
+    LOGGER.trace("One card is turned from the deck to the discard pile");
     const firstCard = this.deck.pop() as Card;
     firstCard.reveal();
     this.discardPile.push(firstCard);
@@ -161,13 +162,13 @@ export class Game {
       for (const player of this.players) {
         // Stop if deck is empty
         if (this.deck.length === 0) {
-          Log.error("Deck is empty");
+          LOGGER.error("Deck is empty");
           break outerLoop;
         }
 
         // Stop if player has no cards left
         if (!player.hasCards()) {
-          Log.error("No cards left for player", player.name);
+          LOGGER.error("No cards left for player", player.name);
           break outerLoop;
         }
 
@@ -179,7 +180,7 @@ export class Game {
         const result = player.checkFullColumn();
         if (result.hasFullColumn) {
           const col = result.fullColumnIndex;
-          Log.info("Full column", {
+          LOGGER.info("Full column", {
             col,
             name: player.name,
             value: (player.cards[col * PC_ROWS] as Card).value,
@@ -187,7 +188,7 @@ export class Game {
           for (let i = 0; i < PC_ROWS; i++) {
             yield;
             const cardIndex = col * PC_ROWS + i;
-            Log.trace(player.cards[cardIndex]);
+            LOGGER.trace(player.cards[cardIndex]);
             this.discardPile.push(player.cards[cardIndex] as Card);
             player.cards[cardIndex] = null;
           }
@@ -195,7 +196,7 @@ export class Game {
 
         // Check if player has revealed all their cards
         if (player.hasRevealedAllCards()) {
-          Log.info(
+          LOGGER.info(
             `Player ${player.name} has revealed all of their cards, finishing the tour`
           );
           this.finished = true;
@@ -207,17 +208,17 @@ export class Game {
       const remainingCards = this.players
         .flatMap((player) => player.cards)
         .filter((card) => card && !card.revealed);
-      Log.info(`Reavealing ${remainingCards.length} remaining cards`);
+      LOGGER.info(`Reavealing ${remainingCards.length} remaining cards`);
       for (const card of remainingCards) {
         yield;
-        Log.trace("revealed", card);
+        LOGGER.trace("revealed", card);
         (card as Card).reveal();
       }
       const rank = this.players
         .map((player) => ({ player, points: player.revealedCardSum() }))
         .sort((a, b) => a.points - b.points)
         .map(({ player }) => player);
-      Log.info(`Game finished, player ${rank[0].name} won`);
+      LOGGER.info(`Game finished, player ${rank[0].name} won`);
     }
   }
 
@@ -254,7 +255,7 @@ export const BASIC_STRATEGY = new GameStrategy({
     if ((game.discardPile.at(-1) as Card).value <= 3) {
       // Pick card from discard pile
       game.pickCard(game.discardPile.pop() as Card);
-      Log.trace("Card taken from discard pile :", game.pickedCard?.value);
+      LOGGER.trace("Card taken from discard pile :", game.pickedCard?.value);
       yield;
     } else {
       // Reveal and pick card from deck
@@ -263,9 +264,9 @@ export const BASIC_STRATEGY = new GameStrategy({
       game.pickCard(game.deck.pop() as Card);
       yield;
       if ((game.pickedCard as Card).value <= 5) {
-        Log.trace("Card taken from deck :", game.pickedCard?.value);
+        LOGGER.trace("Card taken from deck :", game.pickedCard?.value);
       } else {
-        Log.trace(
+        LOGGER.trace(
           "Card picked from deck is too big to be profitable, discarding it"
         );
         game.discardPile.push(game.takePickedCard());
@@ -283,7 +284,7 @@ export const BASIC_STRATEGY = new GameStrategy({
           ({ card }) => (card as Card).value > (game.pickedCard as Card).value
         )
         .sort((a, b) => (b.card as Card).value - (a.card as Card).value);
-      Log.trace({ sortedRevealedCards });
+      LOGGER.trace({ sortedRevealedCards });
 
       let spotIndex;
       if (
@@ -299,8 +300,8 @@ export const BASIC_STRATEGY = new GameStrategy({
         );
         spotIndex = nonRevealedCards[0].index;
       }
-      Log.trace("spotIndex", spotIndex);
-      Log.trace("spotCard", player.cards[spotIndex]);
+      LOGGER.trace("spotIndex", spotIndex);
+      LOGGER.trace("spotCard", player.cards[spotIndex]);
 
       // TODO: Trying to make columns of identical values (only with positive values)
 
@@ -319,7 +320,7 @@ export const BASIC_STRATEGY = new GameStrategy({
         ({ card }) => card && !card.revealed
       );
       const spotIndex = nonRevealedCards[0].index;
-      Log.info(
+      LOGGER.info(
         `Revealing player ${player.name} card with value ${
           (player.cards[spotIndex] as Card).value
         }`

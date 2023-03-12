@@ -7,22 +7,6 @@ const game = new Game();
 let generator: Generator<void>;
 let state: "UNSTARTED" | "INIT" | "PLAYING" = "UNSTARTED";
 
-const gameLogic = (p: P5) => {
-  if (state === "UNSTARTED") {
-    generator = game.initialize(p);
-    state = "INIT";
-  } else if (state === "INIT") {
-    if (generator.next().done) {
-      state = "PLAYING";
-      generator = game.play();
-    }
-  } else if (state === "PLAYING") {
-    if (generator.next().done) {
-      p.noLoop();
-    }
-  }
-};
-
 export const sketch = (p: P5) => {
   p.setup = () => {
     p.createCanvas(600, 400);
@@ -43,12 +27,25 @@ export const sketch = (p: P5) => {
     p.frameRate(10);
     // noLoop();
 
-    setupStyles(p);
+    setupStyles();
   };
 
   p.draw = () => {
-    gameLogic(p);
-    showGame(p, game);
+    if (state === "UNSTARTED") {
+      generator = game.initialize();
+      state = "INIT";
+    } else if (state === "INIT") {
+      if (generator.next().done) {
+        state = "PLAYING";
+        generator = game.play();
+      }
+    } else if (state === "PLAYING") {
+      if (generator.next().done) {
+        p.noLoop();
+      }
+    }
+
+    showGame(game);
   };
 
   p.mousePressed = () => {
@@ -56,4 +53,4 @@ export const sketch = (p: P5) => {
   };
 };
 
-new p5(sketch, document.body);
+export const p5Instance = new p5(sketch, document.body);
